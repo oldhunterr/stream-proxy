@@ -25,6 +25,11 @@ const krakenRoute  = require('./routes/kraken');
 const mp4uploadRoute = require('./routes/mp4upload');
 const streamRoute  = require('./routes/stream');
 
+// ── Global unhandled rejection handler ─────────────────────────────────────────
+process.on('unhandledRejection', (reason) => {
+  console.error(chalk.red('[UNHANDLED REJECTION]'), reason);
+});
+
 const app  = express();
 const PORT = process.env.PORT || 3000;
 

@@ -36,7 +36,7 @@ const guessType = (url = '', ct = '') => {
 };
 
 const HOSTER_MATCHERS = [
-  { test: u => u.includes('lulustream.com') || u.includes('luluvdo.com') || u.includes('lulu.'), route: '/lulu' },
+  { test: u => u.includes('lulustream.com') || u.includes('luluvdo.com') || u.includes('luluvid.com') || u.includes('lulu.'), route: '/lulu' },
   { test: u => /mixdrop\.(ag|co|to|bz)/.test(u), route: '/mixdrop' },
   { test: u => /voe\.(sx|sh)/.test(u), route: '/voe' },
   { test: u => u.includes('doodstream.com') || u.includes('dood') || u.includes('playmogo.com'), route: '/dood' },

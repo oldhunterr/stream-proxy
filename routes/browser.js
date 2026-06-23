@@ -754,6 +754,9 @@ const deepScanPage = async (targetUrl, timeoutMs = 25000) => {
   const closePopups = async (target) => {
     if (finished) return;
     try {
+      // Small delay lets the Stealth plugin finish initializing its evasions
+      // on the new target before we close it, preventing TargetCloseError crashes.
+      await new Promise(r => setTimeout(r, 100));
       const newPage = await target.page();
       if (newPage && newPage !== page) {
         addLog(`Ad tab detected, closing: ${newPage.url().slice(0, 60)}`);
