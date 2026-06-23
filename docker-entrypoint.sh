@@ -45,7 +45,12 @@ if [ -f /etc/wireguard/wg0.conf ]; then
   WG_HOST=$(echo "$ENDPOINT" | cut -d: -f1)
   WG_PORT=$(echo "$ENDPOINT" | cut -d: -f2)
   # Resolve endpoint hostname and add an eth0 route for it
-  WG_IP=$(getent hosts "$WG_HOST" 2>/dev/null | awk '{print $1}')
+  # Prefer IPv4 to avoid routing issues; getent ahosts gives all addresses
+  WG_IP=$(getent ahosts "$WG_HOST" 2>/dev/null | awk '{ if ($1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) print $1; }' | head -1)
+  if [ -z "$WG_IP" ]; then
+    # Fallback to any address
+    WG_IP=$(getent hosts "$WG_HOST" 2>/dev/null | awk '{print $1}' | head -1)
+  fi
   if [ -n "$WG_IP" ]; then
     ip route add "$WG_IP/32" via "$GW" 2>/dev/null || true
   fi
