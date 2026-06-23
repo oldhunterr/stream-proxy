@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mock Inner Player Page (test_hook.html)</title>
+</head>
+<body>
+    <h1>Inner Mock Player Frame</h1>
+    <video id="my-player" controls width="640" height="360"></video>
+    
+    <script>
+        console.log("[INNER] Page loaded. Initiating mock JSON API stream fetches...");
+
+        // 1. Fetch JSON containing HLS stream URL using window.fetch
+        fetch('/api/stream')
+            .then(res => res.json())
+            .then(data => {
+                console.log("[INNER] Fetch API response received:", data);
+                const video = document.getElementById('my-player');
+                // Set source to trigger the universal src setter hook
+                video.src = data.hls_url;
+                // Try playing to trigger play hook
+                video.play().catch(e => console.log("[INNER] Play failed (expected in headless):", e.message));
+            })
+            .catch(err => console.error("[INNER] Error fetching stream JSON via fetch:", err));
+
+        // 2. Fetch JSON containing MP4 stream URL using XMLHttpRequest
+        setTimeout(() => {
+            console.log("[INNER] Initiating XHR request...");
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/stream-xhr');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    console.log("[INNER] XHR response received:", data);
+                    // Dynamically append source elements to test DOM scan
+                    const video = document.getElementById('my-player');
+                    const source = document.createElement('source');
+                    source.src = data.mp4_url;
+                    source.type = 'video/mp4';
+                    video.appendChild(source);
+                }
+            };
+            xhr.send();
+        }, 1000);
+    </script>
+</body>
+</html>

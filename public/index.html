@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Stream Proxy — Dashboard</title>
+  <meta name="description" content="A local research dashboard for proxying, inspecting, and extracting video streams from embedded players." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    /* ── Reset & Tokens ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0d14;
+      --surface:   #111620;
+      --surface2:  #181e2d;
+      --border:    rgba(99,120,180,0.18);
+      --accent:    #4f80ff;
+      --accent2:   #a855f7;
+      --accent3:   #06d6a0;
+      --accent4:   #ff6b6b;
+      --text:      #e2e8f7;
+      --muted:     #6b7fa8;
+      --success:   #06d6a0;
+      --warning:   #ffd166;
+      --error:     #ff6b6b;
+      --radius:    12px;
+      --radius-sm: 8px;
+      --shadow:    0 8px 32px rgba(0,0,0,0.5);
+      --glow:      0 0 24px rgba(79,128,255,0.2);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background grid ────────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(79,128,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,128,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10,13,20,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .logo-text { background: linear-gradient(135deg, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .header-badge {
+      margin-left: auto;
+      font-size: 0.72rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--success);
+      background: rgba(6,214,160,0.1);
+      border: 1px solid rgba(6,214,160,0.25);
+      padding: 3px 10px;
+      border-radius: 20px;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    /* ── Input Panel ────────────────────────────────────────────── */
+    .input-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 32px;
+      box-shadow: var(--shadow);
+    }
+
+    .input-panel h2 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .url-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .url-input {
+      flex: 1;
+      min-width: 260px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .url-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79,128,255,0.15);
+    }
+
+    .url-input::placeholder { color: var(--muted); }
+
+    .mode-select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      color: var(--text);
+      font-size: 0.85rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .btn {
+      padding: 12px 22px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #3a6bff);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(79,128,255,0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(79,128,255,0.45);
+    }
+
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* quick-fill chips */
+    .quick-fills {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .quick-label { font-size: 0.72rem; color: var(--muted); }
+
+    .chip {
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,128,255,0.08); }
+
+    /* ── Tabs ───────────────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      display: flex; align-items: center; gap: 7px;
+      margin-bottom: -1px;
+    }
+
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    .tab-panel { display: none; animation: fadeIn 0.25s ease; }
+    .tab-panel.active { display: block; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Card ───────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .card + .card { margin-top: 20px; }
+
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── Video Player ───────────────────────────────────────────── */
+    #player-wrap {
+      position: relative;
+      background: #000;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      aspect-ratio: 16/9;
+    }
+
+    #player-wrap video {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .player-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      pointer-events: none;
+    }
+
+    .player-overlay .big-icon { font-size: 3rem; opacity: 0.3; }
+
+    .video-info {
+      margin-top: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+      word-break: break-all;
+    }
+
+    /* ── Stream Candidates ──────────────────────────────────────── */
+    .candidate-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 14px;
+    }
+
+    .candidate-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .candidate-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+    .candidate-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .type-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .type-HLS     { background: rgba(6,214,160,0.15); color: var(--success); }
+    .type-MP4     { background: rgba(79,128,255,0.15); color: var(--accent); }
+    .type-DASH    { background: rgba(168,85,247,0.15); color: var(--accent2); }
+    .type-Unknown { background: rgba(107,127,168,0.15); color: var(--muted); }
+    .type-YouTube { background: rgba(255,107,107,0.15); color: var(--error); }
+    .type-Vimeo   { background: rgba(6,214,160,0.15); color: var(--success); }
+
+    .confidence-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .conf-high   { background: var(--success); }
+    .conf-medium { background: var(--warning); }
+    .conf-low    { background: var(--error); }
+
+    .candidate-url {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      word-break: break-all;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .candidate-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .action-btn {
+      font-size: 0.7rem;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .action-btn.play-btn {
+      background: linear-gradient(135deg, var(--accent), #3a6bff);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    /* ── Inspect Log Table ──────────────────────────────────────── */
+    .log-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .log-count {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+
+    th {
+      background: var(--surface2);
+      color: var(--muted);
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      vertical-align: top;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+    }
+
+    tr:hover td { background: rgba(79,128,255,0.04); color: var(--text); }
+
+    .status-ok  { color: var(--success); }
+    .status-err { color: var(--error); }
+    .status-redir { color: var(--warning); }
+
+    .expand-btn {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .detail-row td {
+      padding: 0;
+      background: var(--surface2);
+    }
+
+    .detail-inner {
+      padding: 14px 16px;
+      font-size: 0.72rem;
+      line-height: 1.6;
+      overflow: auto;
+      max-height: 260px;
+    }
+
+    /* ── Cache Stats ────────────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+    }
+
+    .stat-label { font-size: 0.7rem; color: var(--muted); margin-bottom: 6px; }
+    .stat-value { font-size: 1.4rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .stat-sub   { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+
+    .progress-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 3px;
+      transition: width 0.4s;
+    }
+
+    /* ── Loader ─────────────────────────────────────────────────── */
+    .loader {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding: 20px 0;
+    }
+
+    .loader.show { display: flex; }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast ──────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 18px;
+      font-size: 0.82rem;
+      box-shadow: var(--shadow);
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 999;
+      max-width: 320px;
+    }
+
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* ── Empty state ────────────────────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--muted);
+    }
+
+    .empty .icon { font-size: 2.5rem; margin-bottom: 10px; opacity: 0.4; }
+    .empty p { font-size: 0.85rem; }
+
+    /* ── Responsive ─────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      header { padding: 0 16px; }
+      .container { padding: 20px 16px 48px; }
+      .url-row { flex-direction: column; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🎬</div>
+    <span class="logo-text">StreamProxy</span>
+  </div>
+  <div class="header-badge">
+    <span class="status-dot"></span>
+    localhost:3000
+  </div>
+</header>
+
+<!-- ── Main ──────────────────────────────────────────────────────────────── -->
+<div class="container">
+
+  <!-- Input Panel -->
+  <div class="input-panel">
+    <h2>Target URL</h2>
+    <div class="url-row">
+      <input id="urlInput" class="url-input" type="url"
+        placeholder="https://example.com/stream.m3u8  or  https://page-with-embedded-player.com" />
+      <select id="modeSelect" class="mode-select">
+        <option value="stream">⚡ Universal Stream (Smart)</option>
+        <option value="proxy">🔀 Direct Proxy (relay)</option>
+        <option value="hls">📡 HLS rewrite</option>
+        <option value="extract">🔍 Extract streams</option>
+        <option value="inspect">🔎 Inspect traffic</option>
+        <option value="dash">📦 DASH rewrite</option>
+        <option value="dood">🎯 DoodStream</option>
+        <option value="mixdrop">💧 Mixdrop</option>
+        <option value="voe">🌋 Voe</option>
+        <option value="gdrive">📁 Google Drive</option>
+        <option value="fileupload">📤 File-Upload</option>
+        <option value="lulu">🔮 Lulustream</option>
+        <option value="mega">☁️ Mega.nz</option>
+        <option value="browser">🌐 Browser (Puppeteer)</option>
+        <option value="deepscan">🔍 Deep Scan (verify)</option>
+      </select>
+      <button id="goBtn" class="btn btn-primary" onclick="go()">
+        <span>▶</span> Run
+      </button>
+    </div>
+    <div class="quick-fills">
+      <span class="quick-label">Quick test:</span>
+      <span class="chip" onclick="useChip('https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8','stream')">Mux HLS demo</span>
+      <span class="chip" onclick="useChip('https://www.w3schools.com/html/mov_bbb.mp4','stream')">W3S MP4</span>
+      <span class="chip" onclick="useChip('https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd','dash')">Akamai DASH</span>
+      <span class="chip" onclick="useChip('https://www.bbc.co.uk/iplayer/episode/m001vhhp','extract')">BBC iPlayer</span>
+      <span class="chip" onclick="useChip('https://vimeo.com/347119375','extract')">Vimeo page</span>
+      <span class="chip" onclick="useChip('https://playmogo.com/e/dtmjffjmnvv8','stream')">🎯 playmogo Smart</span>
+      <span class="chip" onclick="useChip('https://streamwish.to/e/nzttnqktnks9','stream')">🎯 Streamwish Smart</span>
+      <span class="chip" onclick="useChip('https://uqload.is/embed-eodoaukhojbz.html?utm_source=mirror_net&','stream')">🔍 Uqload Smart</span>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button id="tab-player"  class="tab-btn active" onclick="switchTab('player')">🎬 Player</button>
+    <button id="tab-extract" class="tab-btn"         onclick="switchTab('extract')">🔍 Extract</button>
+    <button id="tab-inspect" class="tab-btn"         onclick="switchTab('inspect')">🔎 Inspect Log</button>
+    <button id="tab-cache"   class="tab-btn"         onclick="switchTab('cache')">💾 Cache</button>
+  </div>
+
+  <!-- ── Player Tab ─────────────────────────────────────────── -->
+  <div id="panel-player" class="tab-panel active">
+    <div class="card">
+      <div class="card-title">📺 Video Player</div>
+      <div id="player-wrap">
+        <div class="player-overlay" id="playerOverlay">
+          <div class="big-icon">🎥</div>
+          <div id="playerStatusText">Enter a URL above and click Run</div>
+        </div>
+        <video id="videoEl" controls style="display:none;"></video>
+      </div>
+      <div class="video-info" id="videoInfo"></div>
+    </div>
+  </div>
+
+  <!-- ── Extract Tab ────────────────────────────────────────── -->
+  <div id="panel-extract" class="tab-panel">
+    <div class="card">
+      <div class="card-title">🔍 Extracted Stream Candidates</div>
+      <div class="loader" id="extractLoader"><div class="spinner"></div> Fetching and analyzing page…</div>
+      <div id="extractResults">
+        <div class="empty"><div class="icon">🔍</div><p>Enter a page URL and click Run → Extract streams</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Inspect Tab ────────────────────────────────────────── -->
+  <div id="panel-inspect" class="tab-panel">
+    <div class="card">
+      <div class="card-title">🔎 Traffic Inspection Log</div>
+      <div class="log-toolbar">
+        <span class="log-count" id="logCount">0 entries</span>
+        <button class="btn btn-ghost" onclick="refreshLog()" style="padding:6px 12px;font-size:0.75rem;">↻ Refresh</button>
+        <button class="btn btn-ghost" onclick="clearLog()"   style="padding:6px 12px;font-size:0.75rem;color:var(--error);">✕ Clear</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+              <th>Status</th>
+              <th>URL</th>
+              <th>Type</th>
+              <th>Size</th>
+              <th>ms</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="logBody">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);">No entries yet. Use the Inspect mode to log traffic.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Cache Tab ──────────────────────────────────────────── -->
+  <div id="panel-cache" class="tab-panel">
+    <div class="card">
+      <div class="card-title">💾 Cache Status</div>
+      <div class="stats-grid" id="cacheStats">
+        <div class="stat-card"><div class="stat-label">Entries</div><div class="stat-value" id="c-size">—</div></div>
+        <div class="stat-card"><div class="stat-label">Used</div><div class="stat-value" id="c-used">—</div><div class="stat-sub" id="c-max"></div><div class="progress-bar"><div class="progress-fill" id="c-bar" style="width:0%"></div></div></div>
+        <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value" id="c-uptime">—</div></div>
+        <div class="stat-card"><div class="stat-label">Memory (RSS)</div><div class="stat-value" id="c-mem">—</div></div>
+      </div>
+      <button class="btn btn-ghost" onclick="refreshStatus()" style="font-size:0.75rem;padding:7px 14px;">↻ Refresh stats</button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── Helpers ────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+const b64 = url => btoa(unescape(encodeURIComponent(url)));
+
+function toast(msg, ok = true) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.style.borderColor = ok ? 'rgba(6,214,160,0.4)' : 'rgba(255,107,107,0.4)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  $('tab-'+name).classList.add('active');
+  $('panel-'+name).classList.add('active');
+}
+
+function useChip(url, mode) {
+  $('urlInput').value = url;
+  $('modeSelect').value = mode;
+}
+
+// ── Main "Run" action ──────────────────────────────────────────────────────
+async function go() {
+  const url  = $('urlInput').value.trim();
+  const mode = $('modeSelect').value;
+  if (!url) { toast('Please enter a URL', false); return; }
+
+  const enc = b64(url);
+
+  if (mode === 'stream') {
+    switchTab('player');
+    const overlay = $('playerOverlay');
+    const statusText = $('playerStatusText');
+    const video = $('videoEl');
+    video.pause();
+    video.style.display = 'none';
+    overlay.style.display = 'flex';
+    statusText.innerHTML = '⚡ Resolving universal stream...<br><span style="font-size:0.75em;color:var(--muted)">This may take a few seconds if deep scanning is required.</span>';
+    
+    try {
+      const res = await fetch(`/stream?url=${enc}&format=json`);
+      if (!res.ok) {
+         if (res.status === 404 || res.status === 502) {
+             throw new Error('Stream not found or no longer playable (video deleted/expired)');
+         }
+         throw new Error(`Server returned ${res.status}`);
+      }
+      const data = await res.json();
+      if (data.url) {
+        statusText.innerHTML = '✅ Stream found! Loading player...';
+        setTimeout(() => playVideo(data.url, url, data.type + ' (Smart)'), 500);
+      } else {
+        throw new Error(data.error || 'No playable stream found');
+      }
+    } catch (e) {
+      statusText.innerHTML = `❌ Failed: ${e.message}`;
+      toast(e.message, false);
+    }
+    return;
+  }
+
+  if (mode === 'proxy' || mode === 'inspect') {
+    const proxyUrl = mode === 'proxy'
+      ? `/proxy?url=${enc}`
+      : `/inspect?url=${enc}`;
+    playVideo(proxyUrl, url, mode);
+    switchTab('player');
+    if (mode === 'inspect') {
+      setTimeout(refreshLog, 2000);
+      switchTab('inspect');
+    }
+    return;
+  }
+
+  if (mode === 'hls') {
+    const hlsUrl = `/hls?url=${enc}`;
+    playVideo(hlsUrl, url, 'hls');
+    switchTab('player');
+    return;
+  }
+
+  if (mode === 'dash') {
+    const dashUrl = `/dash?url=${enc}`;
+    playVideo(dashUrl, url, 'dash');
+    switchTab('player');
+    return;
+  }
+
+  if (mode === 'extract') {
+    switchTab('extract');
+    await runExtract(url, enc);
+    return;
+  }
+
+  if (mode === 'dood') {
+    switchTab('extract');
+    await runDood(url, enc);
+    return;
+  }
+
+  if (mode === 'mixdrop') {
+    switchTab('extract');
+    await runMixdrop(url, enc);
+    return;
+  }
+
+  if (mode === 'voe') {
+    switchTab('extract');
+    await runVoe(url, enc);
+    return;
+  }
+
+  if (mode === 'gdrive') {
+    switchTab('extract');
+    await runGDrive(url, enc);
+    return;
+  }
+
+  if (mode === 'fileupload') {
+    switchTab('extract');
+    await runFileUpload(url, enc);
+    return;
+  }
+
+  if (mode === 'lulu') {
+    switchTab('extract');
+    await runLulu(url, enc);
+    return;
+  }
+
+  if (mode === 'mega') {
+    switchTab('extract');
+    await runMega(url, enc);
+    return;
+  }
+
+  if (mode === 'browser') {
+    switchTab('extract');
+    await runBrowser(url, enc);
+    return;
+  }
+
+  if (mode === 'deepscan') {
+    switchTab('extract');
+    await runDeepscan(url, enc);
+    return;
+  }
+}
+
+let hlsInstance = null;
+
+function playVideo(src, originalUrl, mode) {
+  const video   = $('videoEl');
+  const overlay = $('playerOverlay');
+  const info    = $('videoInfo');
+
+  video.pause();
+  video.src = '';
+  if (hlsInstance) {
+    hlsInstance.destroy();
+    hlsInstance = null;
+  }
+
+  video.style.display = 'block';
+  overlay.style.display = 'none';
+  info.textContent = `▶ ${mode.toUpperCase()} via proxy → ${originalUrl.slice(0, 80)}…`;
+
+  if ((src.includes('.m3u8') || mode === 'hls' || mode.toLowerCase().includes('hls')) && Hls.isSupported()) {
+    hlsInstance = new Hls();
+    hlsInstance.loadSource(src);
+    hlsInstance.attachMedia(video);
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
+      video.play().catch(() => {});
+    });
+  } else {
+    // Native HLS (Safari) or plain MP4
+    video.src = src;
+    video.load();
+    video.play().catch(() => {});
+  }
+
+  toast(`Playing via ${mode} proxy`);
+}
+
+// ── Extract ────────────────────────────────────────────────────────────────
+async function runExtract(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = '';
+
+  try {
+    const res  = await fetch(`/extract?url=${enc}`);
+    const data = await res.json();
+    loader.classList.remove('show');
+
+    if (!data.candidates || data.candidates.length === 0) {
+      results.innerHTML = `<div class="empty"><div class="icon">😶</div><p>No stream URLs found on this page.</p></div>`;
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+
+    data.candidates.forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'candidate-card';
+
+      const typeClass = 'type-' + (c.type || 'Unknown').replace(/[^a-zA-Z]/g,'');
+      const confClass = 'conf-' + (c.confidence || 'low');
+      const shortUrl  = c.url.length > 60 ? c.url.slice(0, 60) + '…' : c.url;
+
+      card.innerHTML = `
+        <div class="candidate-header">
+          <span class="type-badge ${typeClass}">${c.type}</span>
+          <span class="confidence-dot ${confClass}" title="${c.confidence} confidence"></span>
+          <span style="font-size:0.68rem;color:var(--muted)">${c.source}</span>
+        </div>
+        <div class="candidate-url" title="${c.url}">${shortUrl}</div>
+        <div class="candidate-actions">
+          <button class="action-btn play-btn"
+            onclick="playExtracted('${escJs(c.proxyUrl)}','${escJs(c.url)}','${c.type}')">▶ Play</button>
+          ${c.hlsUrl ? `<button class="action-btn" onclick="playExtracted('${escJs(c.hlsUrl)}','${escJs(c.url)}','HLS rewritten')">📡 HLS</button>` : ''}
+          <button class="action-btn" onclick="copyUrl('${escJs(c.url)}')">📋 Copy</button>
+          <button class="action-btn" onclick="inspectUrl('${escJs(c.url)}')">🔎 Inspect</button>
+        </div>`;
+      grid.appendChild(card);
+    });
+
+    results.appendChild(grid);
+    toast(`Found ${data.candidates.length} stream candidate(s)`);
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Error: ${err.message}</p></div>`;
+    toast('Extraction failed: ' + err.message, false);
+  }
+}
+
+function escJs(s) { return (s||'').replace(/'/g,"\\'").replace(/\\/g,'\\\\'); }
+
+function playExtracted(proxyUrl, original, type) {
+  switchTab('player');
+  playVideo(proxyUrl, original, type);
+}
+
+function copyUrl(url) {
+  navigator.clipboard.writeText(url).then(() => toast('Copied to clipboard'));
+}
+
+function inspectUrl(url) {
+  $('urlInput').value = url;
+  $('modeSelect').value = 'inspect';
+  switchTab('inspect');
+  go();
+}
+
+// ── DoodStream Extractor ───────────────────────────────────────────────────
+async function runDood(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = '';
+
+  try {
+    const res  = await fetch(`/dood?url=${enc}&format=json`);
+    const data = await res.json();
+    loader.classList.remove('show');
+
+    if (data.error) {
+      results.innerHTML = `
+        <div class="card" style="margin-top:0">
+          <div class="card-title" style="color:var(--error)">❌ DoodStream Error</div>
+          <p style="color:var(--muted);font-size:0.82rem;margin-bottom:8px;">${data.error}</p>
+          ${data.htmlLength ? `<p style="font-size:0.72rem;color:var(--muted)">HTML received: ${data.htmlLength} bytes (need ~50KB)</p>` : ''}
+          ${data.htmlSnippet ? `<pre style="font-size:0.65rem;color:var(--muted);margin-top:8px;white-space:pre-wrap;overflow:auto;max-height:140px">${data.htmlSnippet}</pre>` : ''}
+        </div>`;
+      toast(data.error, false);
+      return;
+    }
+
+    // Show result as a candidate card
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+
+    const card = document.createElement('div');
+    card.className = 'candidate-card';
+    card.style.borderColor = 'rgba(6,214,160,0.4)';
+    card.innerHTML = `
+      <div class="candidate-header">
+        <span class="type-badge type-MP4">MP4</span>
+        <span class="confidence-dot conf-high" title="high confidence"></span>
+        <span style="font-size:0.68rem;color:var(--muted)">doodstream/pass_md5</span>
+      </div>
+      ${data.title ? `<div style="font-size:0.78rem;color:var(--text);margin-bottom:6px;font-weight:500">${data.title}</div>` : ''}
+      ${data.poster ? `<img src="${data.poster}" style="width:100%;border-radius:6px;margin-bottom:10px;max-height:120px;object-fit:cover" />` : ''}
+      <div class="candidate-url" title="${data.finalUrl}">${(data.finalUrl||'').slice(0, 70)}…</div>
+      <div style="font-size:0.65rem;color:var(--muted);margin-bottom:10px;font-family:'JetBrains Mono',monospace">
+        token: ${data.token} · expires: ${data.expiry ? data.expiry.slice(11,19) : '?'}
+      </div>
+      <div class="candidate-actions">
+        <button class="action-btn play-btn" onclick="playExtracted('${escJs(data.proxyUrl)}','${escJs(data.finalUrl||'')}','MP4')">▶ Play</button>
+        <button class="action-btn" onclick="copyUrl('${escJs(data.finalUrl||'')}')">📋 Copy URL</button>
+        <button class="action-btn" onclick="inspectUrl('${escJs(data.finalUrl||'')}')">🔎 Inspect</button>
+        <button class="action-btn" onclick="copyUrl('${escJs(data.proxyUrl||'')}')">📋 Copy Proxy</button>
+      </div>`;
+
+    grid.appendChild(card);
+
+    // Also show pass_md5 info card
+    const infoCard = document.createElement('div');
+    infoCard.className = 'candidate-card';
+    infoCard.innerHTML = `
+      <div class="card-title" style="margin-bottom:10px">🔬 Resolution Details</div>
+      <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;line-height:1.9;color:var(--muted)">
+        <div><span style="color:var(--accent)">embed</span>: ${(url||'').slice(0,60)}</div>
+        <div><span style="color:var(--accent2)">pass_md5</span>: ${(data.pass_md5Url||'').slice(0,60)}</div>
+        <div><span style="color:var(--success)">base</span>: ${(data.baseVideoUrl||'').slice(0,60)}</div>
+        <div><span style="color:var(--warning)">token</span>: ${data.token}</div>
+        <div><span style="color:var(--warning)">expiry</span>: ${data.expiry}</div>
+      </div>`;
+    grid.appendChild(infoCard);
+
+    results.appendChild(grid);
+    toast('DoodStream URL resolved! ✅');
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Error: ${err.message}</p></div>`;
+    toast('DoodStream extraction failed', false);
+  }
+}
+
+// Helper to resolve the correct proxy URL from either a raw or already-proxied URL
+function resolveExtractedProxy(url, defaultType = 'MP4') {
+  if (!url) return { proxyUrl: '', type: defaultType, badgeClass: 'type-MP4' };
+  
+  if (url.startsWith('/')) {
+    const isHls = url.startsWith('/hls');
+    return {
+      proxyUrl: url,
+      type: isHls ? 'HLS' : defaultType,
+      badgeClass: isHls ? 'type-HLS' : 'type-MP4'
+    };
+  }
+  
+  const isHls = url.includes('.m3u8') || url.includes('/hls?url=');
+  return {
+    proxyUrl: isHls ? '/hls?url=' + b64(url) : '/proxy?url=' + b64(url),
+    type: isHls ? 'HLS' : defaultType,
+    badgeClass: isHls ? 'type-HLS' : 'type-MP4'
+  };
+}
+
+// ── Mixdrop Extractor ──────────────────────────────────────────────────────
+async function runMixdrop(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = '';
+
+  try {
+    const res  = await fetch(`/mixdrop?url=${enc}&format=json`);
+    const data = await res.json();
+    loader.classList.remove('show');
+
+    if (data.error) {
+      results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Mixdrop Error: ${data.error}</p></div>`;
+      toast('Mixdrop extraction failed', false);
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+
+    const card = document.createElement('div');
+    card.className = 'candidate-card';
+    card.style.borderColor = 'rgba(79,128,255,0.4)';
+    const resolved = resolveExtractedProxy(data.url, 'MP4');
+    card.innerHTML = `
+      <div class="candidate-header">
+        <span class="type-badge ${resolved.badgeClass}">${resolved.type}</span>
+        <span class="confidence-dot conf-high" title="high confidence"></span>
+        <span style="font-size:0.68rem;color:var(--muted)">mixdrop/eval-bypass</span>
+      </div>
+      <div class="candidate-url" title="${data.url}">${(data.url||'').slice(0, 70)}…</div>
+      <div class="candidate-actions">
+        <button class="action-btn play-btn" onclick="playExtracted('${escJs(resolved.proxyUrl)}','${escJs(data.url)}','${resolved.type}')">▶ Play</button>
+        <button class="action-btn" onclick="copyUrl('${escJs(data.url)}')">📋 Copy URL</button>
+        <button class="action-btn" onclick="inspectUrl('${escJs(data.url)}')">🔎 Inspect</button>
+      </div>`;
+
+    grid.appendChild(card);
+    results.appendChild(grid);
+    toast('Mixdrop URL resolved! ✅');
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Error: ${err.message}</p></div>`;
+    toast('Mixdrop extraction failed', false);
+  }
+}
+
+// ── Voe Extractor ──────────────────────────────────────────────────────────
+async function runVoe(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = '';
+
+  try {
+    const res  = await fetch(`/voe?url=${enc}&format=json`);
+    const data = await res.json();
+    loader.classList.remove('show');
+
+    if (data.error) {
+      results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Voe Error: ${data.error}</p></div>`;
+      toast('Voe extraction failed', false);
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+
+    const card = document.createElement('div');
+    card.className = 'candidate-card';
+    card.style.borderColor = 'rgba(168,85,247,0.4)';
+    const resolved = resolveExtractedProxy(data.url, 'HLS');
+
+    card.innerHTML = `
+      <div class="candidate-header">
+        <span class="type-badge ${resolved.badgeClass}">${resolved.type}</span>
+        <span class="confidence-dot conf-high" title="high confidence"></span>
+        <span style="font-size:0.68rem;color:var(--muted)">voe/source-extraction</span>
+      </div>
+      <div class="candidate-url" title="${data.url}">${(data.url||'').slice(0, 70)}…</div>
+      <div class="candidate-actions">
+        <button class="action-btn play-btn" onclick="playExtracted('${escJs(resolved.proxyUrl)}','${escJs(data.url)}','${resolved.type}')">▶ Play</button>
+        <button class="action-btn" onclick="copyUrl('${escJs(data.url)}')">📋 Copy URL</button>
+        <button class="action-btn" onclick="inspectUrl('${escJs(data.url)}')">🔎 Inspect</button>
+      </div>`;
+
+    grid.appendChild(card);
+    results.appendChild(grid);
+    toast('Voe URL resolved! ✅');
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Error: ${err.message}</p></div>`;
+    toast('Voe extraction failed', false);
+  }
+}
+
+// ── Google Drive Extractor ─────────────────────────────────────────────────
+async function runGDrive(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = '';
+  try {
+    const res  = await fetch(`/gdrive?url=${enc}&format=json`);
+    const data = await res.json();
+    loader.classList.remove('show');
+    if (data.error) {
+      results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>GDrive Error: ${data.error}</p></div>`;
+      toast('Google Drive extraction failed', false);
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+    const card = document.createElement('div');
+    card.className = 'candidate-card';
+    card.style.borderColor = 'rgba(66,133,244,0.5)';
+    const resolved = resolveExtractedProxy(data.url, 'MP4');
+    card.innerHTML = `
+      <div class="candidate-header">
+        <span class="type-badge ${resolved.badgeClass}">${resolved.type}</span>
+        <span class="confidence-dot conf-high" title="high confidence"></span>
+        <span style="font-size:0.68rem;color:var(--muted)">gdrive/virus-scan-bypass</span>
+      </div>
+      <div class="candidate-url" title="${data.url}">${(data.url||'').slice(0, 70)}…</div>
+      <div style="font-size:0.7rem;color:var(--muted);margin:6px 0">FileID: ${data.fileId || 'N/A'} · Size: ${data.contentLength ? (data.contentLength/1048576).toFixed(1)+'MB' : 'N/A'}</div>
+      <div class="candidate-actions">
+        <button class="action-btn play-btn" onclick="playExtracted('${escJs(resolved.proxyUrl)}','${escJs(data.url)}','${resolved.type}')">▶ Play</button>
+        <button class="action-btn" onclick="copyUrl('${escJs(data.url)}')">📋 Copy URL</button>
+      </div>`;
+    grid.appendChild(card);
+    results.appendChild(grid);
+    toast('Google Drive URL resolved! ✅');
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Error: ${err.message}</p></div>`;
+    toast('Google Drive extraction failed', false);
+  }
+}
+
+// ── File-Upload Extractor ──────────────────────────────────────────────────
+async function runFileUpload(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = '';
+  try {
+    const res  = await fetch(`/fileupload?url=${enc}&format=json`);
+    const data = await res.json();
+    loader.classList.remove('show');
+    if (data.error) {
+      results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>FileUpload Error: ${data.error}</p></div>`;
+      toast('File-Upload extraction failed', false);
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+    const card = document.createElement('div');
+    card.className = 'candidate-card';
+    card.style.borderColor = 'rgba(34,197,94,0.4)';
+    const resolved = resolveExtractedProxy(data.url, 'MP4');
+    card.innerHTML = `
+      <div class="candidate-header">
+        <span class="type-badge ${resolved.badgeClass}">${resolved.type}</span>
+        <span class="confidence-dot conf-high" title="high confidence"></span>
+        <span style="font-size:0.68rem;color:var(--muted)">fileupload/jwplayer-unpack</span>
+      </div>
+      <div class="candidate-url" title="${data.url}">${(data.url||'').slice(0, 70)}…</div>
+      <div class="candidate-actions">
+        <button class="action-btn play-btn" onclick="playExtracted('${escJs(resolved.proxyUrl)}','${escJs(data.url)}','${resolved.type}')">▶ Play</button>
+        <button class="action-btn" onclick="copyUrl('${escJs(data.url)}')">📋 Copy URL</button>
+      </div>`;
+    grid.appendChild(card);
+    results.appendChild(grid);
+    toast('File-Upload URL resolved! ✅');
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Error: ${err.message}</p></div>`;
+    toast('File-Upload extraction failed', false);
+  }
+}
+
+// ── Lulustream Extractor ───────────────────────────────────────────────────
+async function runLulu(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = '';
+  try {
+    const res  = await fetch(`/lulu?url=${enc}&format=json`);
+    const data = await res.json();
+    loader.classList.remove('show');
+    if (data.error) {
+      results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Lulu Error: ${data.error}</p></div>`;
+      toast('Lulustream extraction failed', false);
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+    const card = document.createElement('div');
+    card.className = 'candidate-card';
+    card.style.borderColor = 'rgba(168,85,247,0.4)';
+    const resolved = resolveExtractedProxy(data.url, 'HLS');
+    card.innerHTML = `
+      <div class="candidate-header">
+        <span class="type-badge ${resolved.badgeClass}">${resolved.type}</span>
+        <span class="confidence-dot conf-high" title="high confidence"></span>
+        <span style="font-size:0.68rem;color:var(--muted)">lulu/packed-unpack</span>
+      </div>
+      <div class="candidate-url" title="${data.url}">${(data.url||'').slice(0, 70)}…</div>
+      <div class="candidate-actions">
+        <button class="action-btn play-btn" onclick="playExtracted('${escJs(resolved.proxyUrl)}','${escJs(data.url)}','${resolved.type}')">▶ Play</button>
+        <button class="action-btn" onclick="copyUrl('${escJs(data.url)}')">📋 Copy URL</button>
+      </div>`;
+    grid.appendChild(card);
+    results.appendChild(grid);
+    toast('Lulustream URL resolved! ✅');
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Error: ${err.message}</p></div>`;
+    toast('Lulustream extraction failed', false);
+  }
+}
+
+// ── Mega.nz Extractor ──────────────────────────────────────────────────────
+async function runMega(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = '';
+  try {
+    const res  = await fetch(`/mega?url=${enc}&format=json`);
+    const data = await res.json();
+    loader.classList.remove('show');
+    if (data.error) {
+      results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Mega Error: ${data.error}</p></div>`;
+      toast('Mega extraction failed', false);
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+    const card = document.createElement('div');
+    card.className = 'candidate-card';
+    card.style.borderColor = 'rgba(220,38,38,0.4)';
+    card.innerHTML = `
+      <div class="candidate-header">
+        <span class="type-badge type-MP4">${data.type || 'VIDEO'}</span>
+        <span class="confidence-dot conf-high" title="high confidence"></span>
+        <span style="font-size:0.68rem;color:var(--muted)">mega/aes-decrypt-stream</span>
+      </div>
+      <div class="candidate-url" title="${data.fileName}">${data.fileName || 'Mega file'}</div>
+      <div style="font-size:0.7rem;color:var(--muted);margin:6px 0">Size: ${data.fileSize ? (data.fileSize/1048576).toFixed(1)+'MB' : 'N/A'} · Decrypted streaming via proxy</div>
+      <div class="candidate-actions">
+        <button class="action-btn play-btn" onclick="playExtracted('${escJs(data.url)}','${escJs(url)}','MEGA')">▶ Play</button>
+        <button class="action-btn" onclick="copyUrl('${escJs(data.url)}')">📋 Copy Stream URL</button>
+      </div>`;
+    grid.appendChild(card);
+    results.appendChild(grid);
+    toast('Mega file resolved! ✅');
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>Error: ${err.message}</p></div>`;
+    toast('Mega extraction failed', false);
+  }
+}
+
+// ── Browser (Puppeteer) Extractor ─────────────────────────────────────────
+async function runBrowser(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = `
+    <div class="card" style="margin-top:0;border-color:rgba(79,128,255,0.3)">
+      <div class="card-title" style="color:var(--accent)">🌐 Launching Headless Chrome…</div>
+      <p style="color:var(--muted);font-size:0.82rem">
+        Puppeteer is navigating the page, solving Cloudflare challenges, and intercepting network requests.<br/>
+        <span style="color:var(--warning)">This may take 8–15 seconds.</span>
+      </p>
+    </div>`;
+
+  try {
+    const res  = await fetch(`/browser?url=${enc}&wait=7000`, { signal: AbortSignal.timeout(60000) });
+    const data = await res.json();
+    loader.classList.remove('show');
+
+    if (data.error) {
+      results.innerHTML = `
+        <div class="card" style="margin-top:0">
+          <div class="card-title" style="color:var(--error)">❌ Browser Error</div>
+          <p style="color:var(--muted);font-size:0.82rem">${data.error}</p>
+        </div>`;
+      toast(data.error, false);
+      return;
+    }
+
+    if (!data.candidates || data.candidates.length === 0) {
+      results.innerHTML = `<div class="empty"><div class="icon">😶</div><p>Browser found no stream URLs. Try increasing wait time.</p></div>`;
+      toast('No streams found', false);
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+
+    // Header info card
+    const infoCard = document.createElement('div');
+    infoCard.className = 'candidate-card';
+    infoCard.style.borderColor = 'rgba(79,128,255,0.4)';
+    infoCard.innerHTML = `
+      <div class="card-title" style="margin-bottom:8px">🌐 Browser Extraction Result</div>
+      ${data.pageTitle ? `<div style="font-size:0.82rem;font-weight:600;color:var(--text);margin-bottom:4px">${data.pageTitle}</div>` : ''}
+      ${data.poster ? `<img src="${data.poster}" style="width:100%;border-radius:6px;margin:8px 0;max-height:120px;object-fit:cover" />` : ''}
+      <div style="font-size:0.72rem;color:var(--muted)">Found <strong style="color:var(--success)">${data.count}</strong> candidate(s) via headless Chrome</div>`;
+    grid.appendChild(infoCard);
+
+    data.candidates.forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'candidate-card';
+      if (c.source && c.source.includes('dood')) card.style.borderColor = 'rgba(6,214,160,0.4)';
+      const typeClass = 'type-' + (c.type || 'Unknown').replace(/[^a-zA-Z]/g,'');
+      const shortUrl  = (c.url || '').length > 65 ? c.url.slice(0, 65) + '…' : c.url;
+      card.innerHTML = `
+        <div class="candidate-header">
+          <span class="type-badge ${typeClass}">${c.type || '?'}</span>
+          <span class="confidence-dot conf-high"></span>
+          <span style="font-size:0.65rem;color:var(--muted)">${c.source || ''}</span>
+        </div>
+        ${c.contentType ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:6px">${c.contentType}</div>` : ''}
+        <div class="candidate-url" title="${c.url}">${shortUrl}</div>
+        ${c.expiry ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:8px;font-family:'JetBrains Mono',monospace">expires: ${c.expiry.slice(11,19)} UTC</div>` : ''}
+        <div class="candidate-actions">
+          <button class="action-btn play-btn" onclick="playExtracted('${escJs(c.proxyUrl)}','${escJs(c.url)}','${c.type}')">▶ Play</button>
+          ${c.hlsUrl ? `<button class="action-btn" onclick="playExtracted('${escJs(c.hlsUrl)}','${escJs(c.url)}','HLS')">📡 HLS</button>` : ''}
+          <button class="action-btn" onclick="copyUrl('${escJs(c.url)}')">📋 Copy URL</button>
+          <button class="action-btn" onclick="inspectUrl('${escJs(c.url)}')">🔎 Inspect</button>
+        </div>`;
+      grid.appendChild(card);
+    });
+
+    results.innerHTML = '';
+    results.appendChild(grid);
+    toast(`Browser found ${data.count} stream(s) ✅`);
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = `<div class="empty"><div class="icon">❌</div><p>${err.message}</p></div>`;
+    toast('Browser extraction failed: ' + err.message, false);
+  }
+}
+
+// ── Deep Scan ──────────────────────────────────────────────────────────────
+async function runDeepscan(url, enc) {
+  const loader  = $('extractLoader');
+  const results = $('extractResults');
+  loader.classList.add('show');
+  results.innerHTML = `
+    <div class="card" style="margin-top:0;border-color:rgba(168,85,247,0.4)">
+      <div class="card-title" style="color:var(--accent2)">🔍 Deep Scan Running…</div>
+      <p style="color:var(--muted);font-size:0.82rem">
+        Stealth Chrome → Cloudflare solve → network interception → Range-request verification.<br/>
+        <span style="color:var(--warning)">⏳ Allow 15–25 seconds.</span>
+      </p>
+    </div>`;
+
+  try {
+    const res  = await fetch('/browser/deepscan?url=' + enc + '&wait=9000',
+                             { signal: AbortSignal.timeout(90000) });
+    const data = await res.json();
+    loader.classList.remove('show');
+
+    if (data.error) {
+      results.innerHTML = `<div class="card" style="margin-top:0"><div class="card-title" style="color:var(--error)">❌ ${data.error}</div></div>`;
+      toast(data.error, false); return;
+    }
+
+    const wrap = document.createElement('div');
+
+    // Summary banner
+    const banner = document.createElement('div');
+    banner.className = 'card';
+    banner.style.cssText = 'margin-bottom:20px;border-color:' + (data.summary?.playable > 0 ? 'rgba(6,214,160,0.4)' : 'rgba(255,107,107,0.3)');
+    banner.innerHTML = `
+      <div class="card-title">${data.pageTitle || 'Deep Scan Results'}</div>
+      ${data.poster ? '<img src="' + data.poster + '" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-bottom:12px">' : ''}
+      <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <div><div style="font-size:0.7rem;color:var(--muted)">Total candidates</div>
+             <div style="font-size:1.4rem;font-weight:700;font-family:'JetBrains Mono',monospace">${data.summary?.total ?? 0}</div></div>
+        <div><div style="font-size:0.7rem;color:var(--muted)">Verified playable</div>
+             <div style="font-size:1.4rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--success)">${data.summary?.playable ?? 0}</div></div>
+      </div>`;
+    wrap.appendChild(banner);
+
+    // Candidate cards
+    const grid = document.createElement('div');
+    grid.className = 'candidate-grid';
+
+    (data.candidates || []).forEach(c => {
+      const v = c.verify || {};
+      const verified = v.ok || c.confidence === 'verified';
+      const sizeMB   = v.totalBytes ? (v.totalBytes/1024/1024).toFixed(2)+' MB'
+                     : c.contentLength ? (c.contentLength/1024/1024).toFixed(2)+' MB' : '—';
+      const typeClass = 'type-' + (c.type||'Unknown').replace(/[^a-zA-Z]/g,'');
+      const shortUrl  = (c.url||'').slice(0,65)+'…';
+
+      const card = document.createElement('div');
+      card.className = 'candidate-card';
+      card.style.borderColor = verified ? 'rgba(6,214,160,0.5)' : 'rgba(107,127,168,0.3)';
+      card.innerHTML =
+        '<div class="candidate-header">' +
+          '<span class="type-badge ' + typeClass + '">' + (c.type||'?') + '</span>' +
+          '<span class="confidence-dot ' + (verified?'conf-high':'conf-low') + '"></span>' +
+          '<span style="font-size:0.65rem;color:var(--muted)">' + (c.source||'') + '</span>' +
+          (verified ? '<span style="font-size:0.65rem;color:var(--success);margin-left:auto">✓ verified</span>' : '') +
+        '</div>' +
+        '<div class="candidate-url" title="' + (c.url||'') + '">' + shortUrl + '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0;font-size:0.68rem;font-family:JetBrains Mono,monospace">' +
+          '<div><span style="color:var(--muted)">status</span><br><span style="color:' + (v.status===206||v.status===200?'var(--success)':'var(--error)') + '">' + (v.status||c.status||'—') + '</span></div>' +
+          '<div><span style="color:var(--muted)">content-type</span><br><span style="color:var(--text)">' + (v.contentType||c.contentType||'—') + '</span></div>' +
+          '<div><span style="color:var(--muted)">file size</span><br><span style="color:var(--accent)">' + sizeMB + '</span></div>' +
+          '<div><span style="color:var(--muted)">server</span><br><span style="color:var(--text)">' + (v.server||'—') + '</span></div>' +
+          (c.expiry ? '<div><span style="color:var(--muted)">expires</span><br><span style="color:var(--warning)">' + c.expiry.slice(11,19) + ' UTC</span></div>' : '') +
+          (v.acceptRanges ? '<div><span style="color:var(--muted)">accept-ranges</span><br><span style="color:var(--accent3)">' + v.acceptRanges + '</span></div>' : '') +
+        '</div>' +
+        '<div class="candidate-actions">' +
+          '<button class="action-btn play-btn" onclick="playExtracted(\'' + escJs(c.proxyUrl) + '\',\'' + escJs(c.url) + '\',\'' + (c.type||'') + '\')">▶ Play</button>' +
+          (c.hlsUrl ? '<button class="action-btn" onclick="playExtracted(\'' + escJs(c.hlsUrl) + '\',\'' + escJs(c.url) + '\',\'HLS\')">📡 HLS</button>' : '') +
+          '<button class="action-btn" onclick="copyUrl(\'' + escJs(c.url) + '\')">📋 Copy</button>' +
+          '<button class="action-btn" onclick="inspectUrl(\'' + escJs(c.url) + '\')">🔎 Inspect</button>' +
+        '</div>';
+      grid.appendChild(card);
+    });
+
+    wrap.appendChild(grid);
+    results.innerHTML = '';
+    results.appendChild(wrap);
+    const pl = data.summary?.playable ?? 0;
+    toast(pl > 0 ? pl + ' verified playable stream(s) ✅' : 'No verified streams found', pl > 0);
+  } catch (err) {
+    loader.classList.remove('show');
+    results.innerHTML = '<div class="empty"><div class="icon">❌</div><p>' + err.message + '</p></div>';
+    toast('Deep scan failed: ' + err.message, false);
+  }
+}
+
+async function refreshLog() {
+  try {
+    const res  = await fetch('/inspect/log');
+    const data = await res.json();
+    $('logCount').textContent = `${data.count} entries`;
+    renderLog(data.entries || []);
+  } catch(e) {
+    toast('Failed to fetch log', false);
+  }
+}
+
+function renderLog(entries) {
+  const tbody = $('logBody');
+  if (!entries.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">No entries yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = entries.map(e => {
+    const sc = e.status >= 400 ? 'status-err' : e.status >= 300 ? 'status-redir' : 'status-ok';
+    const size = e.sizeBytes != null ? formatBytes(e.sizeBytes) : '—';
+    const shortUrl = (e.url||'').length > 40 ? (e.url||'').slice(0,40)+'…' : (e.url||'');
+    const ct = (e.contentType||'—').split(';')[0];
+    return `
+      <tr>
+        <td>${e.id}</td>
+        <td>${(e.timestamp||'').slice(11,19)}</td>
+        <td class="${sc}">${e.status||'ERR'}</td>
+        <td title="${e.url}">${shortUrl}</td>
+        <td>${ct}</td>
+        <td>${size}</td>
+        <td>${e.durationMs??'—'}</td>
+        <td><button class="expand-btn" onclick="toggleDetail(${e.id}, this, ${escJs2(JSON.stringify(e))})">+</button></td>
+      </tr>
+      <tr id="detail-${e.id}" class="detail-row" style="display:none">
+        <td colspan="8"><div class="detail-inner" id="detail-inner-${e.id}"></div></td>
+      </tr>`;
+  }).join('');
+}
+
+function escJs2(s) { return "'" + s.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'"; }
+
+function toggleDetail(id, btn, entryJson) {
+  const row = document.getElementById('detail-' + id);
+  const inner = document.getElementById('detail-inner-' + id);
+  const hidden = row.style.display === 'none';
+  row.style.display = hidden ? 'table-row' : 'none';
+  btn.textContent = hidden ? '−' : '+';
+  if (hidden && inner && !inner.dataset.populated) {
+    const e = typeof entryJson === 'string' ? JSON.parse(entryJson) : entryJson;
+    inner.dataset.populated = '1';
+    inner.innerHTML = `
+      <strong style="color:var(--accent)">Request Headers</strong><br>
+      <pre style="white-space:pre-wrap;font-size:0.68rem;margin:4px 0 10px;">${JSON.stringify(e.requestHeaders||{}, null, 2)}</pre>
+      <strong style="color:var(--accent2)">Response Headers</strong><br>
+      <pre style="white-space:pre-wrap;font-size:0.68rem;margin:4px 0;">${JSON.stringify(e.responseHeaders||{}, null, 2)}</pre>
+      ${e.error ? `<br><strong style="color:var(--error)">Error:</strong> ${e.error}` : ''}`;
+  }
+}
+
+async function clearLog() {
+  await fetch('/inspect/clear');
+  renderLog([]);
+  $('logCount').textContent = '0 entries';
+  toast('Log cleared');
+}
+
+// ── Cache Status ───────────────────────────────────────────────────────────
+async function refreshStatus() {
+  try {
+    const res  = await fetch('/status');
+    const data = await res.json();
+    const c = data.cache || {};
+    $('c-size').textContent   = c.size ?? '—';
+    $('c-used').textContent   = formatBytes(c.calculatedSize || 0);
+    $('c-max').textContent    = `/ ${formatBytes(c.maxBytes || 0)}`;
+    $('c-bar').style.width    = (c.usedPercent || 0) + '%';
+    $('c-uptime').textContent = formatUptime(data.uptime || 0);
+    $('c-mem').textContent    = formatBytes(data.memory?.rss || 0);
+  } catch(e) {
+    toast('Failed to fetch status', false);
+  }
+}
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function formatBytes(b) {
+  if (b == null || isNaN(b)) return '—';
+  if (b < 1024)        return b + ' B';
+  if (b < 1024**2)     return (b/1024).toFixed(1) + ' KB';
+  if (b < 1024**3)     return (b/1024**2).toFixed(1) + ' MB';
+  return (b/1024**3).toFixed(2) + ' GB';
+}
+
+function formatUptime(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return [h,m,sec].map(v => String(v).padStart(2,'0')).join(':');
+}
+
+// ── Auto-refresh & init ────────────────────────────────────────────────────
+refreshStatus();
+setInterval(refreshStatus, 30000);
+
+// Allow Enter key in URL input
+$('urlInput').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+</script>
+
+</body>
+</html>
