@@ -38,7 +38,18 @@ if [ -f /etc/wireguard/wg0.conf ]; then
   wg setconf wg0 /tmp/wg_stripped.conf
   ip addr add "$ADDRESS" dev wg0
   ip link set mtu "${MTU:-1420}" up dev wg0
-  # Route all container traffic through wg0 (only affects this container's netns)
+  # Route all container traffic through wg0
+  # Only affects this container's network namespace — host SSH stays up
+  # IMPORTANT: Keep WireGuard's own encrypted UDP packets on eth0 to avoid routing loop
+  GW=$(ip route | grep "^default" | awk '{print $3}')
+  WG_HOST=$(echo "$ENDPOINT" | cut -d: -f1)
+  WG_PORT=$(echo "$ENDPOINT" | cut -d: -f2)
+  # Resolve endpoint hostname and add an eth0 route for it
+  WG_IP=$(getent hosts "$WG_HOST" 2>/dev/null | awk '{print $1}')
+  if [ -n "$WG_IP" ]; then
+    ip route add "$WG_IP/32" via "$GW" 2>/dev/null || true
+  fi
+  # Remove old default and route everything through wg0
   ip route del default 2>/dev/null || true
   ip route add default dev wg0
   echo ">>> WireGuard is up — container traffic routed through VPN"
