@@ -17,6 +17,13 @@ fi
 echo ">>> Installing dependencies..."
 npm install
 
+# Start WireGuard inside the container if config is present
+if [ -f /etc/wireguard/wg0.conf ]; then
+  echo ">>> Starting WireGuard tunnel inside container..."
+  wg-quick up wg0 2>&1 | grep -v "^\[#\]"
+  echo ">>> WireGuard is up — container traffic routed through VPN"
+fi
+
 # If PROXY_URL is set, write it into proxychains config and wrap node
 if [ -n "$PROXY_URL" ]; then
   # Format: socks5://user:pass@host:port  or  http://host:port
