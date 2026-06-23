@@ -3,7 +3,7 @@ FROM node:22-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git ca-certificates \
     chromium chromium-sandbox \
-    proxychains4 wireguard-tools \
+    proxychains4 wireguard-tools iproute2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
