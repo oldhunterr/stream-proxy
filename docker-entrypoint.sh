@@ -20,7 +20,9 @@ npm install
 # Start WireGuard inside the container if config is present
 if [ -f /etc/wireguard/wg0.conf ]; then
   echo ">>> Starting WireGuard tunnel inside container..."
-  wg-quick up wg0 2>&1 | grep -v "^\[#\]"
+  # Pre-set sysctl that wg-quick needs but may fail to set from inside container
+  sysctl -w net.ipv4.conf.all.src_valid_mark=1 2>/dev/null || true
+  wg-quick up wg0 2>&1 | grep -v "^\[#\]" || true
   echo ">>> WireGuard is up — container traffic routed through VPN"
 fi
 
