@@ -34,7 +34,8 @@ if [ -f /etc/wireguard/wg0.conf ]; then
   ip link add wg0 type wireguard
   # wg setconf doesn't accept wg-quick-only keys (Address, DNS, MTU)
   # so we strip those out and feed the rest to setconf
-  grep -v -E "^(Address|DNS|MTU|Table|SaveConfig|PostUp|PreDown|PostDown|PreUp)=" /etc/wireguard/wg0.conf | wg setconf wg0 /dev/stdin
+  grep -v -E "^\s*(Address|DNS|MTU|Table|SaveConfig|PostUp|PreDown|PostDown|PreUp)\s*=" /etc/wireguard/wg0.conf > /tmp/wg_stripped.conf
+  wg setconf wg0 /tmp/wg_stripped.conf
   ip addr add "$ADDRESS" dev wg0
   ip link set mtu "${MTU:-1420}" up dev wg0
   # Route all container traffic through wg0 (only affects this container's netns)
