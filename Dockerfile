@@ -12,7 +12,7 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true \
 
 WORKDIR /app
 
-COPY docker-entrypoint.sh ./proxychains.conf /usr/local/bin/
+COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Default proxychains config — overridden at runtime via PROXY_URL
