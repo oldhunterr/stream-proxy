@@ -1,0 +1,29 @@
+{
+  "name": "video-stream-proxy",
+  "version": "1.0.0",
+  "description": "A comprehensive video stream proxy for testing HLS, MP4, DASH, and embedded player extraction",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "axios-cookiejar-support": "^7.0.0",
+    "chalk": "^4.1.2",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "lru-cache": "^10.3.0",
+    "morgan": "^1.10.0",
+    "node-cache": "^5.1.2",
+    "puppeteer": "^25.1.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "tough-cookie": "^6.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

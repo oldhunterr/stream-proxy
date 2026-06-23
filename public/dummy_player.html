@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mock Dynamic Video Player (Obfuscated)</title>
+</head>
+<body>
+  <h1>Dynamic Video Player Test Page (Obfuscated)</h1>
+  <div id="player-container"></div>
+  <script>
+    // Obfuscate the video URL so static cheerio extractors cannot find it
+    const obfuscatedUrl = "aHR0cHM6Ly90ZXN0LXN0cmVhbXMubXV4LmRldi94MzZ4aHp6L3gzNnhoenoubTN1OA==";
+    
+    // Inject player dynamically after 2 seconds
+    setTimeout(() => {
+      const container = document.getElementById('player-container');
+      const video = document.createElement('video');
+      
+      // Decode URL at runtime
+      video.src = atob(obfuscatedUrl);
+      video.id = 'video-element';
+      
+      container.appendChild(video);
+      console.log('Mock: Video element injected with decoded URL.');
+      
+      // Simulate player play method
+      video.play().catch(e => console.log('Mock: Play request handled:', e.message));
+    }, 2000);
+  </script>
+</body>
+</html>

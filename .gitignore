@@ -1,0 +1,23 @@
+node_modules/
+.env
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.idea/
+.vscode/
+
+# Debug and temporary development files
+/debug_runcode.js
+/decrypted_loader_strings.json
+/decrypted_strings.json
+/loader_downloaded.js
+/requested_urls.json
+/test_mixdrop.js
+/test_providers.js
+/verify_mixdrop.js
+/verify_voe.js
+/voe_dump.html
+/.agents/
+/PROJECT.md
