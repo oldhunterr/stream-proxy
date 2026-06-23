@@ -49,9 +49,13 @@ const HOSTER_MATCHERS = [
 
 const resolveViaHoster = async (route, targetUrl, host) => {
   try {
-    const res = await axios.get(`${host}${route}?url=${encodeUrl(targetUrl)}&format=json`);
+    const url = `${host}${route}?url=${encodeUrl(targetUrl)}&format=json`;
+    console.log(chalk.gray(`  ↳ internal request to: ${url.slice(0, 100)}...`));
+    const res = await axios.get(url);
+    console.log(chalk.gray(`  ↳ hoster returned status ${res.status}, keys: ${Object.keys(res.data).join(',')}`));
     return res.data;
   } catch (err) {
+    console.error(chalk.red(`  ↳ hoster request failed: ${err.message}`));
     return null;
   }
 };
