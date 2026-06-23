@@ -18,11 +18,27 @@ echo ">>> Installing dependencies..."
 npm install
 
 # Start WireGuard inside the container if config is present
+# We use manual setup instead of wg-quick because the sysctl call
+# for src_valid_mark always fails from inside a container, and wg-quick
+# treats that as fatal (tears everything down).
 if [ -f /etc/wireguard/wg0.conf ]; then
-  echo ">>> Starting WireGuard tunnel inside container..."
-  # Pre-set sysctl that wg-quick needs but may fail to set from inside container
-  sysctl -w net.ipv4.conf.all.src_valid_mark=1 2>/dev/null || true
-  wg-quick up wg0 2>&1 | grep -v "^\[#\]" || true
+  echo ">>> Starting WireGuard tunnel inside container (manual setup)..."
+  # Load config values
+  PRIVATE_KEY=$(grep "^PrivateKey" /etc/wireguard/wg0.conf | awk '{print $3}')
+  ADDRESS=$(grep "^Address" /etc/wireguard/wg0.conf | awk '{print $3}')
+  MTU=$(grep "^MTU" /etc/wireguard/wg0.conf | awk '{print $3}')
+  PEER_PUBKEY=$(grep "^PublicKey" /etc/wireguard/wg0.conf | awk '{print $3}')
+  ENDPOINT=$(grep "^Endpoint" /etc/wireguard/wg0.conf | awk '{print $3}')
+  KEEPALIVE=$(grep "^PersistentKeepalive" /etc/wireguard/wg0.conf | awk '{print $3}')
+  # Create and configure the WireGuard interface
+  ip link add wg0 type wireguard
+  wg set wg0 private-key <(echo "$PRIVATE_KEY")
+  wg set wg0 peer "$PEER_PUBKEY" endpoint "$ENDPOINT" persistent-keepalive "${KEEPALIVE:-25}" allowed-ips 0.0.0.0/0
+  ip addr add "$ADDRESS" dev wg0
+  ip link set mtu "${MTU:-1420}" up dev wg0
+  # Route all container traffic through wg0 (only affects this container's netns)
+  ip route del default 2>/dev/null || true
+  ip route add default dev wg0
   echo ">>> WireGuard is up — container traffic routed through VPN"
 fi
 
