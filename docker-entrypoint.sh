@@ -32,8 +32,8 @@ if [ -f /etc/wireguard/wg0.conf ]; then
   KEEPALIVE=$(grep "^PersistentKeepalive" /etc/wireguard/wg0.conf | awk '{print $3}')
   # Create and configure the WireGuard interface
   ip link add wg0 type wireguard
-  wg set wg0 private-key <(echo "$PRIVATE_KEY")
-  wg set wg0 peer "$PEER_PUBKEY" endpoint "$ENDPOINT" persistent-keepalive "${KEEPALIVE:-25}" allowed-ips 0.0.0.0/0
+  # Use wg setconf to apply full config (respects ListenPort, etc.)
+  wg setconf wg0 /etc/wireguard/wg0.conf
   ip addr add "$ADDRESS" dev wg0
   ip link set mtu "${MTU:-1420}" up dev wg0
   # Route all container traffic through wg0 (only affects this container's netns)
