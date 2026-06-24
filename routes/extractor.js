@@ -21,7 +21,7 @@ const decodeUrl = (raw) => {
 const encodeUrl = (u) => Buffer.from(u).toString('base64');
 
 router.get('/video', async (req, res) => {
-  const { host, d, url: urlParam, redirect_stream } = req.query;
+  const { host, d, url: urlParam, redirect_stream, quality } = req.query;
   const rawUrl = d || urlParam;
   if (!host || !rawUrl) return res.status(400).json({ error: 'Missing required parameters: host, d (or url)' });
 
@@ -30,8 +30,11 @@ router.get('/video', async (req, res) => {
 
   console.log(chalk.magenta(`[EXTRACTOR] ${host}:`), targetUrl.slice(0, 100));
 
-  // 1. Try specific extractor + curl_cffi
-  let result = await registry.extractByName(host, targetUrl, { useBrowser: false });
+  // Pass quality preference to the extractor
+  const extractOptions = { useBrowser: false, quality };
+
+  // 1. Try specific extractor
+  let result = await registry.extractByName(host, targetUrl, extractOptions);
 
   // 2. Fallback to Puppeteer deep scan
   if (!result.ok) {

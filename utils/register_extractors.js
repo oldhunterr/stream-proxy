@@ -20,3 +20,6 @@ registry.register(require('../extractors/sportsonline'));
 registry.register(require('../extractors/vidfast'));
 registry.register(require('../extractors/streamhg'));
 registry.register(require('../extractors/vavoo'));
+registry.register(require('../extractors/vk'));
+registry.register(require('../extractors/vid3rb'));
+registry.register(require('../extractors/anime3rb'));

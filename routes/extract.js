@@ -20,6 +20,7 @@ const { CookieJar } = require('tough-cookie');
 const cheerio  = require('cheerio');
 const chalk    = require('chalk');
 const router   = express.Router();
+const registry = require('../utils/extractor_registry');
 
 // Cookie-aware axios instance
 const jar = new CookieJar();
@@ -96,11 +97,14 @@ const JS_PATTERNS = [
   // HLS/DASH manifests
   /["'`](https?:\/\/[^"'`\s]+\.m3u8[^"'`\s]*)["'`]/gi,
   /["'`](https?:\/\/[^"'`\s]+\.mpd[^"'`\s]*)["'`]/gi,
-  // MP4
+  // MP4 (including escaped slashes like https:\/\/)
+  /["'`](https?:\\\/\\\/[^"'`\s]+\.mp4[^"'`\s]*)["'`]/gi,
   /["'`](https?:\/\/[^"'`\s]+\.mp4[^"'`\s]*)["'`]/gi,
-  // Generic src/file/url/stream keys
+  // Generic src/file/url/stream keys (with and without escaped slashes)
+  /(?:file|src|url|source|stream|hls_url|video_url|mp4|stream_url)\s*[:=]\s*["'](https?:\\\/\\\/[^"']{10,})["']/gi,
   /(?:file|src|url|source|stream|hls_url|video_url|mp4|stream_url)\s*[:=]\s*["'`](https?:\/\/[^"'`\s]{10,})["'`]/gi,
-  // JSON-like "url": "..."
+  // JSON-like "url": "..." (with and without escaped slashes)
+  /"(?:url|src|file|source|stream)"\s*:\s*"(https?:\\\/\\\/[^"]{10,})"/gi,
   /"(?:url|src|file|source|stream)"\s*:\s*"(https?:\/\/[^"]{10,})"/gi,
 ];
 
@@ -123,8 +127,9 @@ const extractFromJS = (script) => {
     pattern.lastIndex = 0;
     let match;
     while ((match = pattern.exec(script)) !== null) {
-      const url = match[1];
+      let url = match[1];
       if (url && url.startsWith('http')) {
+        url = url.replace(/\\\//g, '/');
         if (isStreamLike(url)) {
           found.push({ url, source: 'script', confidence: 'medium' });
         }
@@ -374,10 +379,25 @@ const extractFromPage = async (pageUrl, depth = 0, visited = new Set()) => {
 
 router.get('/', async (req, res) => {
   const rawUrl = req.query.url;
+  const wantQuality = req.query.quality;
   if (!rawUrl) return res.status(400).json({ error: 'Missing ?url= parameter' });
 
   const targetUrl = decodeUrl(rawUrl);
 
+  // Try hoster-specific extraction first (if URL matches a known extractor)
+  let directUrl = null;
+  let directHeaders = null;
+  let allQualities = null;
+  try {
+    const hosterResult = await registry.extract(targetUrl, { useBrowser: false, quality: wantQuality });
+    if (hosterResult && hosterResult.ok && hosterResult.url) {
+      directUrl = hosterResult.url;
+      directHeaders = hosterResult.headers || null;
+      allQualities = hosterResult.all_qualities || null;
+    }
+  } catch (_) {}
+
+  // Cheerio-based extraction
   const all = await extractFromPage(targetUrl);
 
   // Deduplicate by URL
@@ -394,11 +414,15 @@ router.get('/', async (req, res) => {
     return (rank[a.confidence] || 2) - (rank[b.confidence] || 2);
   });
 
-  console.log(chalk.green('[EXTRACT]'), `Found ${unique.length} candidates`);
+  console.log(chalk.green('[EXTRACT]'), `Found ${unique.length} candidates${directUrl ? ', + direct URL from hoster' : ''}${wantQuality ? ', quality=' + wantQuality : ''}`);
 
   res.json({
     source: targetUrl,
+    quality: wantQuality || null,
     count: unique.length,
+    direct_url: directUrl,
+    direct_headers: directHeaders,
+    all_qualities: allQualities,
     candidates: unique.map(c => {
       const host = `${req.protocol}://${req.get('host')}`;
       const specializedProxy = getSpecializedProxyUrl(c.url, host);

@@ -51,7 +51,7 @@ const HOSTER_MATCHERS = [
   { test: u => /filelions\.(com|to|site)/i.test(u), route: '/extractor/video?host=FileLions' },
   { test: u => /streamwish\.(com|to|site)/i.test(u), route: '/extractor/video?host=StreamWish' },
   { test: u => /supervideo\.(cc|tv)/i.test(u), route: '/extractor/video?host=Supervideo' },
-  { test: u => /uqload\.(com|io|to)/i.test(u), route: '/extractor/video?host=Uqload' },
+  { test: u => /uqload\.(com|io|to|ws|cx|net|is)/i.test(u), route: '/extractor/video?host=Uqload' },
   { test: u => /turbovidplay\.(com|site)/i.test(u), route: '/extractor/video?host=TurboVidPlay' },
   { test: u => /vidmoly\.(com|me|to)/i.test(u), route: '/extractor/video?host=Vidmoly' },
   { test: u => /fastream\.(com|site)/i.test(u), route: '/extractor/video?host=Fastream' },
@@ -65,13 +65,18 @@ const HOSTER_MATCHERS = [
   { test: u => /vidfast\.(com|site)/i.test(u), route: '/extractor/video?host=VidFast' },
   { test: u => /streamhg\.(com|site)/i.test(u), route: '/extractor/video?host=StreamHG' },
   { test: u => /vavoo\.(to|tv)/i.test(u), route: '/extractor/video?host=Vavoo' },
+  { test: u => /vk\.com|vkvideo\.ru/i.test(u), route: '/extractor/video?host=VK' },
+  { test: u => /vid3rb\.com\/player/i.test(u), route: '/extractor/video?host=Vid3rb' },
+  { test: u => /anime3rb/i.test(u), route: '/extractor/video?host=Vid3rb' },
 ];
 
-const resolveViaHoster = async (route, targetUrl, host) => {
+const resolveViaHoster = async (route, targetUrl, host, extraParams = '') => {
   try {
-    const res = await axios.get(`${host}${route}?url=${encodeUrl(targetUrl)}&format=json`);
+    const sep = route.includes('?') ? '&' : '?';
+    const res = await axios.get(`${host}${route}${sep}url=${encodeUrl(targetUrl)}&format=json${extraParams}`, { timeout: 60000 });
     return res.data;
   } catch (err) {
+    console.log(chalk.red(`  ↳ hoster resolve failed: ${err.message}`));
     return null;
   }
 };
@@ -165,6 +170,7 @@ const ERROR_TS_B64 =
 router.get('/', async (req, res) => {
   const rawUrl = req.query.url;
   const wantJson = req.query.format === 'json';
+  const wantQuality = req.query.quality;
   if (!rawUrl) return res.status(400).json({ error: 'Missing ?url= parameter' });
 
   const targetUrl = decodeUrl(rawUrl);
@@ -187,7 +193,7 @@ router.get('/', async (req, res) => {
     if (verify.ok) {
       const type = guessType(targetUrl, verify.contentType);
       const proxyUrl = (type === 'HLS' 
-        ? `${host}/hls?url=${encodeUrl(targetUrl)}`
+        ? `${host}/hls?url=${encodeUrl(targetUrl)}&max_res=true`
         : `${host}/proxy?url=${encodeUrl(targetUrl)}`) + companionSuffix;
       console.log(chalk.green('  ↳ direct URL verified playable!'));
       
@@ -200,9 +206,17 @@ router.get('/', async (req, res) => {
   const matchedHoster = HOSTER_MATCHERS.find(h => h.test(lowerUrl));
   if (matchedHoster) {
     console.log(chalk.gray(`  ↳ known hoster matched → ${matchedHoster.route}`));
-    const resolved = await resolveViaHoster(matchedHoster.route, targetUrl, host);
-    if (resolved && (resolved.url || resolved.proxyUrl)) {
+    const qualityParam = wantQuality ? `&quality=${encodeURIComponent(wantQuality)}` : '';
+    const resolved = await resolveViaHoster(matchedHoster.route, targetUrl, host, qualityParam);
+    if (!resolved) console.log(chalk.red('  ↳ hoster returned null'));
+    if (resolved && (resolved.url || resolved.proxyUrl || resolved.destination_url)) {
       let finalUrl = resolved.proxyUrl || resolved.url;
+      if (!finalUrl && resolved.destination_url) {
+        const isHls = resolved.destination_url.includes('.m3u8');
+        const endpoint = isHls ? 'hls' : 'proxy';
+        const headersB64 = Buffer.from(JSON.stringify(resolved.request_headers || {})).toString('base64');
+        finalUrl = `/${endpoint}?url=${encodeUrl(resolved.destination_url)}&headers=${headersB64}&max_res=true`;
+      }
       if (companionSuffix && finalUrl.includes('/proxy') && !finalUrl.includes('stremio=')) {
         finalUrl += companionSuffix;
       }
@@ -261,7 +275,7 @@ router.get('/', async (req, res) => {
       if (scan.cookieStr) extraHeaders['Cookie'] = scan.cookieStr;
       const b64 = Buffer.from(JSON.stringify(extraHeaders)).toString('base64');
       const proxyUrl = (type === 'HLS'
-        ? `${host}/hls?url=${encodeUrl(scan.url)}&headers=${b64}`
+        ? `${host}/hls?url=${encodeUrl(scan.url)}&headers=${b64}&max_res=true`
         : `${host}/proxy?url=${encodeUrl(scan.url)}&headers=${b64}`) + companionSuffix;
 
       if (wantJson) return res.json({ url: proxyUrl, type, source: 'deep-scanner', confidence: 'verified' });

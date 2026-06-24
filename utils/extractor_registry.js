@@ -29,11 +29,16 @@ async function extractByName(name, url, options = {}) {
 }
 
 async function extractWithExt(ext, url, options = {}) {
-  const { useCurlCffi = false, useBrowser = false, browserTimeout = 15000 } = options;
+  const { useCurlCffi = false, useBrowser = false, browserTimeout = 15000, quality } = options;
 
   // 1. Try specific extractor logic
   try {
-    const result = await ext.extract(url);
+    const result = await ext.extract(url, { quality });
+    if (result && result.url) {
+      const response = { ok: true, url: result.url, headers: result.headers || {}, source: ext.name };
+      if (result.all_qualities) response.all_qualities = result.all_qualities;
+      return response;
+    }
     if (result && result.url) return { ok: true, url: result.url, headers: result.headers || {}, source: ext.name };
   } catch (_) {}
 

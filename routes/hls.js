@@ -77,14 +77,17 @@ const rewriteLine = (line, baseUrl, proxyBase, headersParam = '') => {
 
   // Segment / sub-playlist URI line
   const abs = resolveUrl(trimmed, baseUrl);
+  const pathPart = abs.split('?')[0].split('#')[0].toLowerCase();
 
-  // If it looks like another .m3u8 (sub-playlist) → route through /hls
-  if (abs.includes('.m3u8') || abs.includes('playlist') || abs.includes('index')) {
-    return `${proxyBase}/hls?url=${encodeUrl(abs)}${headersParam}`;
+  // Known segment extensions → route through /proxy (raw passthrough)
+  const SEGMENT_EXTS = ['.ts', '.mp4', '.m4s', '.aac', '.m4a', '.webm', '.mkv', '.flv', '.mp3', '.ac3', '.eac3'];
+  if (SEGMENT_EXTS.some(ext => pathPart.endsWith(ext))) {
+    return `${proxyBase}/proxy?url=${encodeUrl(abs)}${headersParam}`;
   }
 
-  // Otherwise it's a segment → route through /proxy
-  return `${proxyBase}/proxy?url=${encodeUrl(abs)}${headersParam}`;
+  // Everything else (playlists, manifests, unknown extensions, no extension)
+  // → route through /hls for recursive manifest rewriting
+  return `${proxyBase}/hls?url=${encodeUrl(abs)}${headersParam}`;
 };
 
 router.get('/', async (req, res) => {
@@ -144,6 +147,33 @@ router.get('/', async (req, res) => {
 
     const proxyBase = `${req.protocol}://${req.get('host')}`;
     const lines = upstream.data.split('\n');
+
+    // If max_res=true, filter master playlist to only the highest bandwidth variant
+    if (req.query.max_res === 'true' || req.query.max_res === '1') {
+      const masterLineIdx = lines.findIndex(l => l.startsWith('#EXT-X-STREAM-INF'));
+      if (masterLineIdx !== -1) {
+        let bestIdx = -1;
+        let bestBw = -1;
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith('#EXT-X-STREAM-INF')) {
+            const bwMatch = lines[i].match(/BANDWIDTH=(\d+)/i);
+            if (bwMatch) {
+              const bw = parseInt(bwMatch[1]);
+              if (bw > bestBw) { bestBw = bw; bestIdx = i; }
+            }
+          }
+        }
+        if (bestIdx !== -1 && bestIdx + 1 < lines.length) {
+          const bestUrl = lines[bestIdx + 1].trim();
+          if (bestUrl) {
+            const absUrl = resolveUrl(bestUrl, targetUrl);
+            const redirectUrl = `${proxyBase}/hls?url=${encodeUrl(absUrl)}${headersParam + companionParam}`;
+            return res.redirect(redirectUrl);
+          }
+        }
+      }
+    }
+
     const rewritten = lines.map(line => rewriteLine(line, targetUrl, proxyBase, headersParam + companionParam)).join('\n');
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');

@@ -70,4 +70,13 @@ async function makeRequest(url, options = {}) {
   throw lastErr || new ExtractorError('Request failed after retries');
 }
 
-module.exports = { makeRequest, ExtractorError, UA };
+async function getCookieString(url) {
+  try {
+    const cookies = await jar.getCookies(url);
+    return cookies.map(c => `${c.key}=${c.value}`).join('; ');
+  } catch (_) {
+    return '';
+  }
+}
+
+module.exports = { makeRequest, getCookieString, ExtractorError, UA };

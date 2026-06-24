@@ -875,6 +875,11 @@ async function go() {
 
 let hlsInstance = null;
 
+function playDirect(url, source) {
+  switchTab('player');
+  playVideo(url, url, 'Direct (' + source + ')');
+}
+
 function playVideo(src, originalUrl, mode) {
   const video   = $('videoEl');
   const overlay = $('playerOverlay');
@@ -920,8 +925,52 @@ async function runExtract(url, enc) {
     const data = await res.json();
     loader.classList.remove('show');
 
+    // Show direct_url from hoster extractor (if available)
+    if (data.direct_url) {
+      const directCard = document.createElement('div');
+      directCard.className = 'card';
+      directCard.style.marginTop = '0';
+      directCard.style.marginBottom = '16px';
+      const qualityLabel = data.quality ? ` ${data.quality}` : '';
+      directCard.innerHTML = `
+        <div class="card-title" style="color:var(--accent3)">⭐ Best Quality${qualityLabel} (Hoster Extractor)</div>
+        <div class="candidate-url" style="word-break:break-all;font-size:0.78rem;margin-bottom:12px;">${escJs(data.direct_url)}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" style="padding:8px 16px;font-size:0.78rem;"
+            onclick="playDirect('${escJs(data.direct_url)}','${escJs(data.source || '')}')">▶ Play Direct</button>
+          <button class="btn btn-ghost" style="padding:8px 16px;font-size:0.78rem;"
+            onclick="copyUrl('${escJs(data.direct_url)}')">📋 Copy URL</button>
+        </div>
+        ${data.direct_headers ? `<div style="margin-top:8px;font-size:0.7rem;color:var(--muted)">Headers: ${escJs(JSON.stringify(data.direct_headers))}</div>` : ''}
+      `;
+      results.appendChild(directCard);
+    }
+
+    // Show all qualities when quality=all is used
+    if (data.all_qualities && data.all_qualities.length > 0) {
+      const qualCard = document.createElement('div');
+      qualCard.className = 'card';
+      qualCard.style.marginTop = '0';
+      qualCard.style.marginBottom = '16px';
+      let html = '<div class="card-title">📊 All Available Qualities</div><div style="display:flex;flex-direction:column;gap:8px;">';
+      data.all_qualities.forEach(q => {
+        const shortUrl = (q.url || '').length > 50 ? q.url.substring(0, 50) + '...' : q.url;
+        html += '<div style="background:var(--surface2);border-radius:8px;padding:10px;font-size:0.78rem;">';
+        html += '<div style="font-weight:600;margin-bottom:4px;">' + escJs(q.label) + (q.res ? ' (' + q.res + 'p)' : '') + '</div>';
+        html += '<div style="color:var(--muted);word-break:break-all;margin-bottom:6px;">' + escJs(shortUrl) + '</div>';
+        html += '<button class="action-btn play-btn" onclick="playDirect(\'' + escJs(q.url) + '\',\'' + escJs(q.label) + '\')">▶ Play</button>';
+        html += '<button class="action-btn" onclick="copyUrl(\'' + escJs(q.url) + '\')" style="margin-left:4px;">📋 Copy</button>';
+        html += '</div>';
+      });
+      html += '</div>';
+      qualCard.innerHTML = html;
+      results.appendChild(qualCard);
+    }
+
     if (!data.candidates || data.candidates.length === 0) {
-      results.innerHTML = `<div class="empty"><div class="icon">😶</div><p>No stream URLs found on this page.</p></div>`;
+      if (!data.direct_url) {
+        results.innerHTML = `<div class="empty"><div class="icon">😶</div><p>No stream URLs found on this page.</p></div>`;
+      }
       return;
     }
 

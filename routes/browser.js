@@ -754,14 +754,17 @@ const deepScanPage = async (targetUrl, timeoutMs = 25000) => {
   const closePopups = async (target) => {
     if (finished) return;
     try {
-      // Small delay lets the Stealth plugin finish initializing its evasions
-      // on the new target before we close it, preventing TargetCloseError crashes.
-      await new Promise(r => setTimeout(r, 100));
       const newPage = await target.page();
       if (newPage && newPage !== page) {
-        addLog(`Ad tab detected, closing: ${newPage.url().slice(0, 60)}`);
-        // Defer close to let stealth plugin finish initialization first
-        setImmediate(() => newPage.close().catch(() => {}));
+        await new Promise(r => setTimeout(r, 300));
+        const url = newPage.url() || '';
+        const urlLower = url.toLowerCase();
+        // Only close known ad/tracking domains and chrome-error pages
+        const isAd = /google-analytics|doubleclick|googlesyndication|adservice|popunder|taboola|outbrain|exoclick|chrome-error/i.test(urlLower);
+        if (isAd) {
+          addLog(`Ad/tracker detected, closing: ${url.slice(0, 60)}`);
+          setImmediate(() => newPage.close().catch(() => {}));
+        }
       }
     } catch (_) {}
   };
@@ -1062,6 +1065,11 @@ const deepScanPage = async (targetUrl, timeoutMs = 25000) => {
         });
       } catch (err) {
         addLog(`Page evaluation failed: ${err.message}`);
+        // If the page was closed/redirected (detached frame), break out of the loop
+        if (err.message && (err.message.includes('detached Frame') || err.message.includes('Target closed') || err.message.includes('Execution context was destroyed'))) {
+          addLog('Page was closed or navigated away — stopping scan.');
+          break;
+        }
       }
 
       let cookieStr = '';
@@ -1070,6 +1078,10 @@ const deepScanPage = async (targetUrl, timeoutMs = 25000) => {
         cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
       } catch (err) {
         addLog(`Failed to fetch cookies: ${err.message}`);
+        if (err.message && (err.message.includes('detached Frame') || err.message.includes('Target closed'))) {
+          addLog('Page was closed or navigated away — stopping scan.');
+          break;
+        }
       }
 
       for (const entry of pageData) {
