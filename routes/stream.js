@@ -44,7 +44,27 @@ const HOSTER_MATCHERS = [
   { test: u => u.includes('file-upload.org') || u.includes('fileupload'), route: '/fileupload' },
   { test: u => u.includes('krakenfiles.com'), route: '/kraken' },
   { test: u => u.includes('mp4upload.com'), route: '/mp4upload' },
-  { test: u => u.includes('drive.google.com'), route: '/gdrive' }
+  { test: u => u.includes('drive.google.com'), route: '/gdrive' },
+  { test: u => /vidoza\.net|videzz\.net/i.test(u), route: '/extractor/video?host=Vidoza' },
+  { test: u => /streamtape\.com|streamtape\.net/i.test(u), route: '/extractor/video?host=Streamtape' },
+  { test: u => /ok\.ru|odnoklassniki/i.test(u), route: '/extractor/video?host=Okru' },
+  { test: u => /filelions\.(com|to|site)/i.test(u), route: '/extractor/video?host=FileLions' },
+  { test: u => /streamwish\.(com|to|site)/i.test(u), route: '/extractor/video?host=StreamWish' },
+  { test: u => /supervideo\.(cc|tv)/i.test(u), route: '/extractor/video?host=Supervideo' },
+  { test: u => /uqload\.(com|io|to)/i.test(u), route: '/extractor/video?host=Uqload' },
+  { test: u => /turbovidplay\.(com|site)/i.test(u), route: '/extractor/video?host=TurboVidPlay' },
+  { test: u => /vidmoly\.(com|me|to)/i.test(u), route: '/extractor/video?host=Vidmoly' },
+  { test: u => /fastream\.(com|site)/i.test(u), route: '/extractor/video?host=Fastream' },
+  { test: u => /vixcloud\.(co|com)/i.test(u), route: '/extractor/video?host=VixCloud' },
+  { test: u => /f16px\.(com|site)/i.test(u), route: '/extractor/video?host=F16Px' },
+  { test: u => /gupload\.(com|site)/i.test(u), route: '/extractor/video?host=Gupload' },
+  { test: u => /filemoon\.(com|site|sx)/i.test(u), route: '/extractor/video?host=FileMoon' },
+  { test: u => /maxstream\.(com|site)/i.test(u), route: '/extractor/video?host=Maxstream' },
+  { test: u => /livetv\.(com|site)/i.test(u), route: '/extractor/video?host=LiveTV' },
+  { test: u => /sportsonline|sports?online/i.test(u), route: '/extractor/video?host=Sportsonline' },
+  { test: u => /vidfast\.(com|site)/i.test(u), route: '/extractor/video?host=VidFast' },
+  { test: u => /streamhg\.(com|site)/i.test(u), route: '/extractor/video?host=StreamHG' },
+  { test: u => /vavoo\.(to|tv)/i.test(u), route: '/extractor/video?host=Vavoo' },
 ];
 
 const resolveViaHoster = async (route, targetUrl, host) => {

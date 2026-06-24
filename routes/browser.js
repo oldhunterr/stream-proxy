@@ -760,7 +760,8 @@ const deepScanPage = async (targetUrl, timeoutMs = 25000) => {
       const newPage = await target.page();
       if (newPage && newPage !== page) {
         addLog(`Ad tab detected, closing: ${newPage.url().slice(0, 60)}`);
-        await newPage.close().catch(() => {});
+        // Defer close to let stealth plugin finish initialization first
+        setImmediate(() => newPage.close().catch(() => {}));
       }
     } catch (_) {}
   };

@@ -1,0 +1,22 @@
+const registry = require('./extractor_registry');
+
+registry.register(require('../extractors/vidoza'));
+registry.register(require('../extractors/streamtape'));
+registry.register(require('../extractors/okru'));
+registry.register(require('../extractors/filelions'));
+registry.register(require('../extractors/streamwish'));
+registry.register(require('../extractors/supervideo'));
+registry.register(require('../extractors/uqload'));
+registry.register(require('../extractors/turbovidplay'));
+registry.register(require('../extractors/vidmoly'));
+registry.register(require('../extractors/fastream'));
+registry.register(require('../extractors/vixcloud'));
+registry.register(require('../extractors/f16px'));
+registry.register(require('../extractors/gupload'));
+registry.register(require('../extractors/filemoon'));
+registry.register(require('../extractors/maxstream'));
+registry.register(require('../extractors/livetv'));
+registry.register(require('../extractors/sportsonline'));
+registry.register(require('../extractors/vidfast'));
+registry.register(require('../extractors/streamhg'));
+registry.register(require('../extractors/vavoo'));

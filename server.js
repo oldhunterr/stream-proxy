@@ -4,6 +4,16 @@ const morgan = require('morgan');
 const chalk = require('chalk');
 const path = require('path');
 
+process.on('unhandledRejection', (reason, promise) => {
+  if (reason && reason.message && reason.message.includes('Target closed')) {
+    return;
+  }
+  if (reason && reason.message && reason.message.includes('Protocol error')) {
+    return;
+  }
+  console.error(chalk.red('[UNHANDLED REJECTION]'), reason);
+});
+
 const corsMiddleware = require('./middleware/cors');
 const cacheMiddleware = require('./middleware/cache');
 
@@ -24,6 +34,10 @@ const megaRoute    = require('./routes/mega');
 const krakenRoute  = require('./routes/kraken');
 const mp4uploadRoute = require('./routes/mp4upload');
 const streamRoute  = require('./routes/stream');
+const extractorRoute = require('./routes/extractor');
+const generateRoute  = require('./routes/generate');
+
+require('./utils/register_extractors');
 
 // ── Global unhandled rejection handler ─────────────────────────────────────────
 process.on('unhandledRejection', (reason) => {
@@ -49,6 +63,9 @@ app.use(morgan((tokens, req, res) => {
     chalk.gray(tokens.res(req, res, 'content-length') || '–' + ' bytes'),
   ].join(' ');
 }));
+
+// ── Body parsing ────────────────────────────────────────────────────────────────
+app.use(express.json());
 
 // ── Global CORS ───────────────────────────────────────────────────────────────
 app.use(corsMiddleware);
@@ -94,6 +111,8 @@ app.use('/lulu',    redirectFallback, luluRoute);
 app.use('/mega',    redirectFallback, megaRoute);
 app.use('/kraken',  redirectFallback, krakenRoute);
 app.use('/mp4upload', redirectFallback, mp4uploadRoute);
+app.use('/extractor', extractorRoute);
+app.use('/generate',  generateRoute);
 app.use('/stream',    streamRoute);
 
 // ── Root redirect ─────────────────────────────────────────────────────────────
