@@ -195,12 +195,13 @@ const extractFromPage = async (pageUrl, depth = 0, visited = new Set()) => {
   if (depth > MAX_DEPTH || visited.has(pageUrl)) return [];
   visited.add(pageUrl);
 
-  if (pageUrl.includes('share4max.com')) {
-    console.log(chalk.cyan('[SHARE4MAX] Extracting mirrors list...'));
+  if (pageUrl.includes('share4max.com') || pageUrl.includes('megamax.me')) {
+    const baseDomain = pageUrl.includes('share4max.com') ? 'share4max.com' : 'megamax.me';
+    console.log(chalk.cyan(`[${baseDomain.toUpperCase()}] Extracting mirrors list...`));
     try {
       // 1. Fetch initial HTML to get Inertia version
       const r1 = await axiosCj.get(pageUrl, {
-        headers: { 'User-Agent': UA, 'Referer': 'https://share4max.com/' },
+        headers: { 'User-Agent': UA, 'Referer': `https://${baseDomain}/` },
         timeout: TIMEOUT_MS
       });
       const html1 = r1.data;
